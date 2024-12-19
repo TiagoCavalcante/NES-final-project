@@ -1,122 +1,42 @@
-import React, { useState, useEffect } from "react"
-import Papa from "papaparse"
-import { z } from "zod"
+import { ArcElement, Chart as ChartJS, Legend, Tooltip } from "chart.js"
+import React, { useEffect, useState } from "react"
 import { Pie } from "react-chartjs-2"
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js"
 import InfiniteScroll from "react-infinite-scroll-component"
+import { College, csvFile } from "../schemas/college"
+import useColleges from "../hooks/useColleges"
+import useSuggestions from "../hooks/useSuggestions"
+import SuggestionList from "../components/SuggestionsList"
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
-// See https://en.wikipedia.org/wiki/Levenshtein_distance
-// Code from https://stackoverflow.com/questions/10473745/compare-strings-javascript-return-of-likely
-const editDistance = (s1: string, s2: string) => {
-  const costs = []
-
-  for (let i = 0; i <= s1.length; i++) {
-    let lastValue = i
-    for (let j = 0; j <= s2.length; j++) {
-      if (i == 0) {
-        costs[j] = j
-      } else {
-        if (j > 0) {
-          let newValue = costs[j - 1]
-
-          if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
-            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1
-          }
-
-          costs[j - 1] = lastValue
-          lastValue = newValue
-        }
-      }
-    }
-    if (i > 0) {
-      costs[s2.length] = lastValue
-    }
-  }
-
-  return costs[s2.length]
-}
-
-const similarity = (s1: string, s2: string) => {
-  let longer = s1
-  let shorter = s2
-
-  if (s1.length < s2.length) {
-    longer = s2
-    shorter = s1
-  }
-
-  const longerLength = longer.length
-
-  return (longerLength - editDistance(longer, shorter)) / longerLength
-}
-
-const nullToUndefined = (value: string | null) =>
-  value === null ? undefined : value
-
-// Define Zod schema for a single row in the CSV
-const CollegeSchema = z.object({
-  INSTNM: z.string(),
-  CITY: z.string(),
-  ADM_RATE: z.string().nullable().transform(nullToUndefined),
-  SAT_AVG: z.string().nullable().transform(nullToUndefined),
-  FEMALE: z.string().nullable().transform(nullToUndefined),
-  FIRST_GEN: z.string().nullable().transform(nullToUndefined),
-  TUITIONFEE_IN: z.string().nullable().transform(nullToUndefined),
-  TUITIONFEE_OUT: z.string().nullable().transform(nullToUndefined),
-})
-
-type College = z.infer<typeof CollegeSchema>
-
-const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
-  const [data, setData] = useState<College[]>([])
+const CollegeTable = () => {
   const [displayedData, setDisplayedData] = useState<College[]>([])
   const [filteredData, setFilteredData] = useState<College[]>([])
   const [hasMore, setHasMore] = useState(true)
   const chunkSize = 20
   const [search, setSearch] = useState("")
   const [cityFilter, setCityFilter] = useState("")
-  const [institutionSuggestions, setInstitutionSuggestions] = useState<
-    string[]
-  >([])
-  const [citySuggestions, setCitySuggestions] = useState<string[]>([])
   const [sortKey, setSortKey] = useState<
     "ADM_RATE" | "SAT_AVG" | "TUITIONFEE_IN" | "TUITIONFEE_OUT" | null
   >(null)
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
 
-  useEffect(() => {
-    fetch(csvFile)
-      .then((response) => response.text())
-      .then((csvText) => {
-        Papa.parse<unknown>(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            const validatedData = results.data
-              .map((row) => CollegeSchema.safeParse(row))
-              .filter(
-                (parsed): parsed is { success: true; data: College } =>
-                  parsed.success,
-              )
-              .map((parsed) => parsed.data)
-              .filter((college) => {
-                return (
-                  college.ADM_RATE !== null ||
-                  college.SAT_AVG !== null ||
-                  college.TUITIONFEE_IN !== null ||
-                  college.TUITIONFEE_OUT !== null
-                )
-              })
+  const { data } = useColleges({ csvFile })
+  const institutionSuggestions = useSuggestions({
+    items: data.map((college) => college.INSTNM),
+    query: search,
+  })
 
-            setData(validatedData)
-            setFilteredData(validatedData)
-            setDisplayedData(validatedData.slice(0, chunkSize))
-          },
-        })
-      })
-  }, [csvFile])
+  const citySuggestions = useSuggestions({
+    items: data.map((college) => college.CITY),
+    query: cityFilter,
+  })
+
+  useEffect(() => {
+    setFilteredData(data)
+    setDisplayedData(data.slice(0, chunkSize))
+    setHasMore(data.length > chunkSize)
+  }, [data])
 
   const loadMoreData = () => {
     if (displayedData.length >= filteredData.length) {
@@ -134,20 +54,6 @@ const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
     const query = e.target.value.toLowerCase()
     setSearch(query)
 
-    const suggestions = Array.from(
-      new Set(
-        data
-          .map((college) => college.INSTNM)
-          .filter((name) => similarity(name.toLowerCase(), query) > 0.3)
-          .sort(
-            (a, b) =>
-              similarity(b.toLowerCase(), query) -
-              similarity(a.toLowerCase(), query),
-          ),
-      ),
-    ).slice(0, 5)
-    setInstitutionSuggestions(suggestions)
-
     const filtered = data.filter(
       (college) =>
         college.INSTNM.toLowerCase().includes(query) &&
@@ -163,20 +69,6 @@ const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
     const query = e.target.value.toLowerCase()
     setCityFilter(query)
 
-    const suggestions = Array.from(
-      new Set(
-        data
-          .map((college) => college.CITY)
-          .filter((city) => similarity(city.toLowerCase(), query) > 0.3)
-          .sort(
-            (a, b) =>
-              similarity(b.toLowerCase(), query) -
-              similarity(a.toLowerCase(), query),
-          ),
-      ),
-    ).slice(0, 5)
-    setCitySuggestions(suggestions)
-
     const filtered = data.filter(
       (college) =>
         college.CITY.toLowerCase().includes(query) &&
@@ -185,6 +77,36 @@ const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
     setFilteredData(filtered)
     setDisplayedData(filtered.slice(0, chunkSize))
     setHasMore(filtered.length > chunkSize)
+  }
+
+  const handleSuggestionClick = (
+    type: "institution" | "city",
+    suggestion: string,
+  ) => {
+    if (type === "institution") {
+      setSearch(suggestion.toLowerCase())
+
+      const filtered = data.filter(
+        (college) =>
+          college.INSTNM.toLowerCase() === suggestion.toLowerCase() &&
+          (!cityFilter ||
+            college.CITY.toLowerCase().includes(cityFilter.toLowerCase())),
+      )
+      setFilteredData(filtered)
+      setDisplayedData(filtered.slice(0, chunkSize))
+      setHasMore(filtered.length > chunkSize)
+    } else if (type === "city") {
+      setCityFilter(suggestion.toLowerCase())
+
+      const filtered = data.filter(
+        (college) =>
+          college.CITY.toLowerCase() === suggestion.toLowerCase() &&
+          (!search || college.INSTNM.toLowerCase().includes(search)),
+      )
+      setFilteredData(filtered)
+      setDisplayedData(filtered.slice(0, chunkSize))
+      setHasMore(filtered.length > chunkSize)
+    }
   }
 
   const handleSort = (
@@ -215,8 +137,8 @@ const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
     const sorted = [...filteredData]
       .filter((college) => college[key]) // Exclude rows with "N/A" for this column
       .sort((a, b) => {
-        const valA = parseFloat(a[key] || "0")
-        const valB = parseFloat(b[key] || "0")
+        const valA = a[key]
+        const valB = b[key]
         return nextOrder === "asc" ? valA - valB : valB - valA
       })
 
@@ -224,9 +146,9 @@ const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
     setDisplayedData(sorted.slice(0, chunkSize))
   }
 
-  const renderPieChart = (female?: string, firstGen?: string) => {
-    const femalePercentage = parseFloat(female || "0") * 100
-    const firstGenPercentage = parseFloat(firstGen || "0") * 100
+  const renderPieChart = (female: number, firstGen: number) => {
+    const femalePercentage = female * 100
+    const firstGenPercentage = firstGen * 100
 
     const data = {
       labels: ["Female", "First Generation", "Other"],
@@ -264,6 +186,7 @@ const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
         College Table
       </h1>
       <div className="flex flex-col sm:flex-row justify-between mb-4">
+        {/* Institution Name Search */}
         <div className="relative">
           <input
             type="text"
@@ -272,47 +195,30 @@ const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
             onChange={handleSearch}
             className="mb-2 sm:mb-0 sm:mr-2 p-2 border border-gray-300 rounded w-full"
           />
-          {institutionSuggestions.length > 0 && (
-            <ul className="absolute z-10 bg-white border border-gray-300 rounded w-full">
-              {institutionSuggestions.map((suggestion, idx) => (
-                <li
-                  key={idx}
-                  onClick={() => {
-                    setSearch(suggestion)
-                    setInstitutionSuggestions([])
-                  }}
-                  className="p-2 hover:bg-gray-100 cursor-pointer"
-                >
-                  {suggestion}
-                </li>
-              ))}
-            </ul>
-          )}
+          <SuggestionList
+            suggestions={institutionSuggestions}
+            onSuggestionClick={(suggestion) =>
+              handleSuggestionClick("institution", suggestion)
+            }
+          />
         </div>
         <div className="relative">
-          <input
-            type="text"
-            placeholder="Filter by city"
-            value={cityFilter}
-            onChange={handleCityFilter}
-            className="mb-2 sm:mb-0 sm:mr-2 p-2 border border-gray-300 rounded w-full"
-          />
-          {citySuggestions.length > 0 && (
-            <ul className="absolute z-10 bg-white border border-gray-300 rounded w-full">
-              {citySuggestions.map((suggestion, idx) => (
-                <li
-                  key={idx}
-                  onClick={() => {
-                    setCityFilter(suggestion)
-                    setCitySuggestions([])
-                  }}
-                  className="p-2 hover:bg-gray-100 cursor-pointer"
-                >
-                  {suggestion}
-                </li>
-              ))}
-            </ul>
-          )}
+          {/* City Filter */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Filter by city"
+              value={cityFilter}
+              onChange={handleCityFilter}
+              className="mb-2 sm:mb-0 sm:mr-2 p-2 border border-gray-300 rounded w-full"
+            />
+            <SuggestionList
+              suggestions={citySuggestions}
+              onSuggestionClick={(suggestion) =>
+                handleSuggestionClick("city", suggestion)
+              }
+            />
+          </div>
         </div>
         <div className="flex space-x-2">
           <button
@@ -413,12 +319,10 @@ const CollegeTable: React.FC<{ csvFile: string }> = ({ csvFile }) => {
                   {row.CITY}
                 </td>
                 <td className="border border-gray-300 px-4 py-2 text-gray-800">
-                  {row.ADM_RATE
-                    ? `${(parseFloat(row.ADM_RATE) * 100).toFixed(1)}%`
-                    : "N/A"}
+                  {(row.ADM_RATE * 100).toFixed(1)}%
                 </td>
                 <td className="border border-gray-300 px-4 py-2 text-gray-800">
-                  {row.SAT_AVG ? `${row.SAT_AVG}` : "N/A"}
+                  {row.SAT_AVG}
                 </td>
                 <td className="border border-gray-300 px-4 py-2 text-gray-800">
                   {row.TUITIONFEE_IN && row.TUITIONFEE_OUT
