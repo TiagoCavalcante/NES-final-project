@@ -9,7 +9,8 @@ const SuggestionList: React.FC<SuggestionListProps> = ({
   suggestions,
   onSuggestionClick,
 }) => {
-  const [justChangedSuggestion, setJustChangedSuggestion] = useState<boolean>(false)
+  const [justChangedSuggestion, setJustChangedSuggestion] =
+    useState<boolean>(false)
   const [visible, setVisible] = useState<boolean>(true)
   const wrapperRef = useRef<HTMLUListElement>(null)
 

@@ -1,6 +1,10 @@
 import Papa from "papaparse"
 import { useEffect, useState } from "react"
-import { College, CompleteCollegeSchema, IncompleteCollegeSchema } from "../schemas/college"
+import {
+  College,
+  CompleteCollegeSchema,
+  IncompleteCollegeSchema,
+} from "../schemas/college"
 
 type UseCollegesProps = {
   csvFile: string
@@ -13,7 +17,10 @@ type UseCollegesReturn = {
   error: string | null
 }
 
-const useColleges = ({ csvFile, filter = true }: UseCollegesProps): UseCollegesReturn => {
+const useColleges = ({
+  csvFile,
+  filter = true,
+}: UseCollegesProps): UseCollegesReturn => {
   const [data, setData] = useState<College[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
