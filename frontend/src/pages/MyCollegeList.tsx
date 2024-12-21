@@ -405,8 +405,10 @@ const CollegeListPage: React.FC = () => {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <h1 className="text-3xl font-bold text-center mb-6">My College Lists</h1>
+    <div>
+      <Navbar/>
+      <div className="min-h-screen bg-gray-900 p-6">
+        <h1 className="mt-16 text-3xl text-white font-bold text-center mb-6">My College Lists</h1>
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex justify-center flex-wrap">
