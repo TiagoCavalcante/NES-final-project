@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react"
 import Papa from "papaparse"
-import { CollegeSchema, College } from "../schemas/college"
+import { useEffect, useState } from "react"
+import { College, CompleteCollegeSchema, IncompleteCollegeSchema } from "../schemas/college"
 
 type UseCollegesProps = {
   csvFile: string
+  filter?: boolean
 }
 
 type UseCollegesReturn = {
@@ -12,12 +13,14 @@ type UseCollegesReturn = {
   error: string | null
 }
 
-const useColleges = ({ csvFile }: UseCollegesProps): UseCollegesReturn => {
+const useColleges = ({ csvFile, filter = true }: UseCollegesProps): UseCollegesReturn => {
   const [data, setData] = useState<College[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    const schema = filter ? CompleteCollegeSchema : IncompleteCollegeSchema
+
     const fetchData = async () => {
       try {
         const response = await fetch(csvFile)
@@ -31,7 +34,7 @@ const useColleges = ({ csvFile }: UseCollegesProps): UseCollegesReturn => {
           skipEmptyLines: true,
           complete: (results) => {
             const validatedData = results.data
-              .map((row) => CollegeSchema.safeParse(row))
+              .map((row) => schema.safeParse(row))
               .filter(
                 (parsed): parsed is { success: true; data: College } =>
                   parsed.success,
@@ -61,7 +64,7 @@ const useColleges = ({ csvFile }: UseCollegesProps): UseCollegesReturn => {
     }
 
     fetchData()
-  }, [csvFile])
+  }, [csvFile, filter])
 
   return { data, loading, error }
 }
