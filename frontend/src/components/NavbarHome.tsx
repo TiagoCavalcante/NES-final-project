@@ -19,6 +19,12 @@ function NavbarHome() {
         <li>
           <Link to={"/Simulator"}><p className="text-xl hover:text-purple-800 hover:translate-y-1">Simulator</p></Link>
         </li>
+        <li>
+          <Link to={"/login"}><p className="text-xl hover:text-purple-800 hover:translate-y-1">Login</p></Link>
+        </li>
+        <li>
+          <Link to={"/register"}><p className="text-xl hover:text-purple-800 hover:translate-y-1">Sign up</p></Link>
+        </li>
       </ul>
     </nav>
   );
