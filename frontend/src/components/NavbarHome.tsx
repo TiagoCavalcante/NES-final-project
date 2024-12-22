@@ -14,7 +14,7 @@ function NavbarHome() {
           <Link to={"/Colleges"}><p className="text-xl hover:text-purple-800 hover:translate-y-1">Colleges</p></Link>
         </li>
         <li>
-          <Link to={"/Goals"}><p className="text-xl hover:text-purple-800 hover:translate-y-1">Goals</p></Link>
+          <Link to={"/my_college_list"}><p className="text-xl hover:text-purple-800 hover:translate-y-1">Goals</p></Link>
         </li>
         <li>
           <Link to={"/Simulator"}><p className="text-xl hover:text-purple-800 hover:translate-y-1">Simulator</p></Link>
